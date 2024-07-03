@@ -1,0 +1,9 @@
+# Dataset Path
+path: /Users/bhanuprakash/Documents/vision_gard/Dataset
+
+train: /Users/bhanuprakash/Documents/vision_gard/Dataset/images/train
+val: /Users/bhanuprakash/Documents/vision_gard/Dataset/images/val
+test: /Users/bhanuprakash/Documents/vision_gard/Dataset/test
+
+# Class Names
+names: [Stop, No pedestrian crossing, No parking, Parking, Give way, One way, No left turn, Speed limit, Bus lane, Pedestrian crossing]
