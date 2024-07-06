@@ -86,11 +86,9 @@ The detector.py script uses the trained YOLOv10m model for detecting traffic sig
 
 ## Validation Video
 
-
 You can view the validation result video below:
 
 <iframe src="https://vimeo.com/979280907" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
-
 
 
 
