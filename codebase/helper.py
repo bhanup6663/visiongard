@@ -16,7 +16,6 @@ class Yolov10n_Detector:
         scores = results.boxes.conf.cpu().numpy()
         class_ids = results.boxes.cls.cpu().numpy()
         
-        # Filter detections based on confidence threshold
         mask = scores >= self.confidence_threshold
         bboxes = bboxes[mask]
         scores = scores[mask]
@@ -37,8 +36,7 @@ class Vehicle_Detector:
         scores = results.boxes.conf.cpu().numpy()
         class_ids = results.boxes.cls.cpu().numpy()
         
-        # Filter detections based on confidence threshold and only keep vehicle classes
-        vehicle_classes = [2, 3, 5, 7]  # Example class IDs for vehicles: car, truck, bus, motorcycle
+        vehicle_classes = [2, 3, 5, 7]
         mask = (scores >= self.confidence_threshold) & (np.isin(class_ids, vehicle_classes))
         bboxes = bboxes[mask]
         scores = scores[mask]
@@ -53,10 +51,10 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
     cap = cv2.VideoCapture(video_path)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
 
     if save_results:
         os.makedirs(save_dir, exist_ok=True)
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
         save_result_name = 'stop_sign_violations.avi'
         save_result_path = os.path.join(save_dir, save_result_name)
@@ -65,6 +63,7 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
     stop_sign_detected = False
     stop_sign_position = None
     violation_records = []
+    violation_info = None  # New variable to store a single violation info with timestamp
 
     frame_count = 0
 
@@ -73,7 +72,13 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
         if not ret:
             break
 
-        frame_count += 1
+        current_time = cap.get(cv2.CAP_PROP_POS_MSEC)
+
+        # Draw stored violation bounding box on the frame if within the last 5 seconds
+        if violation_info and current_time - violation_info['timestamp'] <= 5000:
+            x1, y1, x2, y2 = violation_info['bbox']
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, 'VIOLATION', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
         # Detect traffic signs
         traffic_bboxes, traffic_scores, traffic_class_ids = traffic_detector.detect(frame)
@@ -129,17 +134,24 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
 
                 if (x1 > stop_sign_position[0] and x1 < stop_sign_position[2] and
                     y1 > stop_sign_position[1] and y1 < stop_sign_position[3]):
+                    violation_info = {
+                        'bbox': (x1, y1, x2, y2),
+                        'timestamp': current_time
+                    }
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+                    cv2.putText(frame, f'VIOLATION ID: {track_id}', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+
                     violation_records.append({
                         'frame': frame,
                         'tracking_id': track_id,
                         'bbox': (x1, y1, x2, y2),
-                        'timestamp': cap.get(cv2.CAP_PROP_POS_MSEC)
+                        'timestamp': current_time
                     })
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                    cv2.putText(frame, f'VIOLATION ID: {track_id}', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
         if save_results:
             out.write(frame)
+
+        frame_count += 1
 
     cap.release()
     if save_results:
@@ -149,13 +161,12 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
 
 # Initialize models and tracker
 traffic_model_path = '/Users/bhanuprakash/Documents/vision_gard/Project-yolo/traffic-signals/weights/best.pt'
-vehicle_model_path = '/Users/bhanuprakash/Documents/vision_gard/yolov8n.pt'  # Path to a pre-trained vehicle detection model
-traffic_detector = Yolov10n_Detector(traffic_model_path, confidence_threshold=0.6)  # Increased threshold
-vehicle_detector = Vehicle_Detector(vehicle_model_path, confidence_threshold=0.6)  # Increased threshold
+vehicle_model_path = '/Users/bhanuprakash/Documents/vision_gard/yolov8n.pt'
+traffic_detector = Yolov10n_Detector(traffic_model_path, confidence_threshold=0.6)
+vehicle_detector = Vehicle_Detector(vehicle_model_path, confidence_threshold=0.6)
 tracker = DeepSort(max_age=15)
 
 video_path = '/Users/bhanuprakash/Documents/vision_gard/test1.mp4'
 stop_sign_class_id = 0  # Assuming the class ID for 'Stop' is 0
 
 violations = detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, tracker, stop_sign_class_id, save_results=True)
-
