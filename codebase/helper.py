@@ -46,8 +46,48 @@ class Vehicle_Detector:
         
         return bboxes, scores, class_ids
 
-# Function to detect stop sign violations
-def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, tracker, stop_sign_class_id, save_results=False, save_dir='violation_results'):
+class ViolationDetector:
+    def __init__(self):
+        self.stop_sign_info = None  # To store the stop sign violation info
+        self.no_left_turn_info = None  # To store the no left turn violation info
+
+    def check_stop_sign_violation(self, track, stop_sign_position, current_time):
+        x1, y1, x2, y2 = map(int, track.to_ltrb(orig=True))
+        if (x1 > stop_sign_position[0] and x1 < stop_sign_position[2] and
+            y1 > stop_sign_position[1] and y1 < stop_sign_position[3]):
+            self.stop_sign_info = {
+                'bbox': (x1, y1, x2, y2),
+                'timestamp': current_time
+            }
+            return True
+        return False
+
+    def check_no_left_turn_violation(self, track, no_left_turn_position, current_time):
+        x1, y1, x2, y2 = map(int, track.to_ltrb(orig=True))
+        # Check if the vehicle is making a left turn
+        # Here you should add logic to detect if the vehicle is making a left turn based on its trajectory
+        is_making_left_turn = True  # Placeholder for actual left turn detection logic
+
+        if is_making_left_turn:
+            self.no_left_turn_info = {
+                'bbox': (x1, y1, x2, y2),
+                'timestamp': current_time
+            }
+            return True
+        return False
+
+    def draw_violations(self, frame, current_time):
+        if self.stop_sign_info and current_time - self.stop_sign_info['timestamp'] <= 5000:
+            x1, y1, x2, y2 = self.stop_sign_info['bbox']
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, 'STOP SIGN VIOLATION', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+
+        if self.no_left_turn_info and current_time - self.no_left_turn_info['timestamp'] <= 5000:
+            x1, y1, x2, y2 = self.no_left_turn_info['bbox']
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+            cv2.putText(frame, 'NO LEFT TURN VIOLATION', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
+
+def detect_violations(video_path, traffic_detector, vehicle_detector, tracker, stop_sign_class_id, no_left_turn_class_id, save_results=False, save_dir='violation_results'):
     cap = cv2.VideoCapture(video_path)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -56,17 +96,13 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
     if save_results:
         os.makedirs(save_dir, exist_ok=True)
         fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-        save_result_name = 'stop_sign_violations.avi'
+        save_result_name = 'violations.avi'
         save_result_path = os.path.join(save_dir, save_result_name)
         out = cv2.VideoWriter(save_result_path, fourcc, fps, (width, height))
 
-    stop_sign_detected = False
-    stop_sign_position = None
-    violation_records = []
-    violation_info = None  # New variable to store a single violation info with timestamp
+    violation_detector = ViolationDetector()
 
     frame_count = 0
-
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -74,11 +110,8 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
 
         current_time = cap.get(cv2.CAP_PROP_POS_MSEC)
 
-        # Draw stored violation bounding box on the frame if within the last 5 seconds
-        if violation_info and current_time - violation_info['timestamp'] <= 5000:
-            x1, y1, x2, y2 = violation_info['bbox']
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
-            cv2.putText(frame, 'VIOLATION', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+        # Draw existing violation boxes
+        violation_detector.draw_violations(frame, current_time)
 
         # Detect traffic signs
         traffic_bboxes, traffic_scores, traffic_class_ids = traffic_detector.detect(frame)
@@ -87,9 +120,10 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
         print(f"[DEBUG] Frame {frame_count}: Detected traffic signs:")
         for bbox, score, class_id in zip(traffic_bboxes, traffic_scores, traffic_class_ids):
             print(f"  - Bbox: {bbox}, Score: {score}, Class ID: {class_id}")
-        
-        # Filter to only include stop sign class
-        traffic_detections = [(bbox, score, class_id) for bbox, score, class_id in zip(traffic_bboxes, traffic_scores, traffic_class_ids) if class_id == stop_sign_class_id]
+
+        # Separate detections for stop sign and no left turn sign
+        stop_sign_detections = [(bbox, score, class_id) for bbox, score, class_id in zip(traffic_bboxes, traffic_scores, traffic_class_ids) if class_id == stop_sign_class_id]
+        no_left_turn_detections = [(bbox, score, class_id) for bbox, score, class_id in zip(traffic_bboxes, traffic_scores, traffic_class_ids) if class_id == no_left_turn_class_id]
 
         # Detect vehicles
         vehicle_bboxes, vehicle_scores, vehicle_class_ids = vehicle_detector.detect(frame)
@@ -98,9 +132,9 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
         print(f"[DEBUG] Frame {frame_count}: Detected vehicles:")
         for bbox, score, class_id in zip(vehicle_bboxes, vehicle_scores, vehicle_class_ids):
             print(f"  - Bbox: {bbox}, Score: {score}, Class ID: {class_id}")
-        
+
         # Combine detections for tracking
-        detections = traffic_detections + list(zip(vehicle_bboxes, vehicle_scores, vehicle_class_ids))
+        detections = stop_sign_detections + no_left_turn_detections + list(zip(vehicle_bboxes, vehicle_scores, vehicle_class_ids))
         print(f"[DEBUG] Frame {frame_count}: Combined detections for tracking: {len(detections)} objects.")
         
         tracks = tracker.update_tracks(detections, frame=frame)
@@ -116,37 +150,17 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
 
             print(f"[DEBUG] Frame {frame_count}: Track ID {track_id}, Class ID {class_id}, Bbox: {ltrb}")
 
-            if class_id == stop_sign_class_id:
-                stop_sign_detected = True
-                stop_sign_position = (x1, y1, x2, y2)
-
-        if stop_sign_detected and stop_sign_position:
-            for track in tracks:
-                if not track.is_confirmed() or track.det_class == stop_sign_class_id:
-                    continue
-                
-                track_id = track.track_id
-                ltrb = track.to_ltrb(orig=True)
-                class_id = track.det_class
-                x1, y1, x2, y2 = map(int, ltrb)
-
-                print(f"[DEBUG] Frame {frame_count}: Checking vehicle for violation - Track ID {track_id}, Class ID {class_id}, Bbox: {ltrb}")
-
-                if (x1 > stop_sign_position[0] and x1 < stop_sign_position[2] and
-                    y1 > stop_sign_position[1] and y1 < stop_sign_position[3]):
-                    violation_info = {
-                        'bbox': (x1, y1, x2, y2),
-                        'timestamp': current_time
-                    }
+            # Check for stop sign violations
+            for bbox, score, class_id in stop_sign_detections:
+                if violation_detector.check_stop_sign_violation(track, bbox, current_time):
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
                     cv2.putText(frame, f'VIOLATION ID: {track_id}', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
 
-                    violation_records.append({
-                        'frame': frame,
-                        'tracking_id': track_id,
-                        'bbox': (x1, y1, x2, y2),
-                        'timestamp': current_time
-                    })
+            # Check for no left turn violations
+            for bbox, score, class_id in no_left_turn_detections:
+                if violation_detector.check_no_left_turn_violation(track, bbox, current_time):
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                    cv2.putText(frame, f'VIOLATION ID: {track_id}', (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
 
         if save_results:
             out.write(frame)
@@ -157,7 +171,7 @@ def detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, 
     if save_results:
         out.release()
 
-    return violation_records
+    return violation_detector.stop_sign_info, violation_detector.no_left_turn_info
 
 # Initialize models and tracker
 traffic_model_path = '/Users/bhanuprakash/Documents/vision_gard/Project-yolo/traffic-signals/weights/best.pt'
@@ -168,5 +182,6 @@ tracker = DeepSort(max_age=15)
 
 video_path = '/Users/bhanuprakash/Documents/vision_gard/test1.mp4'
 stop_sign_class_id = 0  # Assuming the class ID for 'Stop' is 0
+no_left_turn_class_id = 6  # Assuming the class ID for 'No Left Turn' is 6
 
-violations = detect_stop_sign_violations(video_path, traffic_detector, vehicle_detector, tracker, stop_sign_class_id, save_results=True)
+stop_sign_info, no_left_turn_info = detect_violations(video_path, traffic_detector, vehicle_detector, tracker, stop_sign_class_id, no_left_turn_class_id, save_results=True)
