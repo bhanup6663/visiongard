@@ -90,9 +90,7 @@ You can view the validation result video below:
 
 ## Validation Video
 
-You can view the validation result video below:
-
-[![Validation Video](https://miro.medium.com/v2/resize:fit:1400/format:webp/1*G16xctUj_UX_wgqaGRE74w.png)](https://vimeo.com/979280907)
+You can view the validation result [![Validation Video]()](https://vimeo.com/979280907)
 
 
 
