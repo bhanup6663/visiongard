@@ -89,7 +89,7 @@ The detector.py script uses the trained YOLOv10m model for detecting traffic sig
 
 You can view the validation result video below:
 
-<iframe src="https://github.com/bhanup6663/visiongard/raw/main/codebase/violation_results/combined_violations.mp4" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
+<iframe src="https://vimeo.com/979280907" width="640" height="360" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>
 
 
 
