@@ -1,0 +1,6 @@
+opencv-python-headless
+numpy
+torch
+torchvision
+ultralytics
+deep_sort_realtime
