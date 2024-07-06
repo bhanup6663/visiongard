@@ -85,10 +85,12 @@ The detector.py script uses the trained YOLOv10m model for detecting traffic sig
 
 ## Validation Video
 
-You can view the validation result video.
+You can view the validation result video below:
 
-![Validation Video](https://github.com/bhanup6663/visiongard/blob/main/codebase/violation_results/combined_violations.mp4)
-
+<video width="600" controls>
+  <source src="https://github.com/bhanup6663/visiongard/blob/main/codebase/violation_results/combined_violations.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
 ## Approach
 
 ### Why YOLOv10m and YOLOv8n?
