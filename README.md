@@ -90,7 +90,7 @@ You can view the validation result video below:
 
 ## Validation Video
 
-You can view the validation result [![Validation Video]()](https://github.com/user-attachments/assets/6aad8dae-76f8-48e5-96f5-eade6efdbc75)
+https://github.com/bhanup6663/visiongard/assets/6aad8dae-76f8-48e5-96f5-eade6efdbc75
 
 
 
